@@ -1,0 +1,6 @@
+@Digdir.Bod.RoadmapReport_HostAddress = http://localhost:5209
+
+GET {{Digdir.Bod.RoadmapReport_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
