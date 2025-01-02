@@ -2,20 +2,38 @@ namespace Digdir.Bod.RoadmapReport;
 
 public static class IssuesHelper
 {
-    private const int ReductionPerPercentOverdue = 3;
+    private const int ReductionPerPercentOverdue = 1;
     
     public static List<RoadmapIssue> ToRoadmapIssues(this IEnumerable<GitHubIssue> issues)
     {
-        return issues.Select(x => x.ToRoadmapIssue()).ToList();
+        return issues.Select(x => x.ToRoadmapIssue()).OfType<RoadmapIssue>().ToList();
     }
     
-    public static RoadmapIssue ToRoadmapIssue(this GitHubIssue issue)
+    private static RoadmapIssue? ToRoadmapIssue(this GitHubIssue issue)
     {
+        // Check if it's an issue for the modernization project
+        if (issue.Labels.All(x => x.Name != "program/nye-altinn"))
+        {
+            return null;
+        }
+        
         // Find product name in labels
         var product = issue.Labels.FirstOrDefault(x => x.Name.StartsWith("product/"))?.Name.Replace("product/", string.Empty);
         if (product == null)
         {
-            throw new Exception("Product not found in labels");
+            return null;
+        }
+        
+        // Find start and end date in custom properties
+        var startDateString = issue.CustomProperties.FirstOrDefault(x => x.Name == "Start")?.Value;
+        if (!DateTimeOffset.TryParse(startDateString, out var startDate))
+        {
+            return null;
+        }
+        var endDateString = issue.CustomProperties.FirstOrDefault(x => x.Name == "Sluttdato")?.Value;
+        if (!DateTimeOffset.TryParse(endDateString, out var endDate))
+        {
+            return null;
         }
         
         // Find progression in custom properties
@@ -24,18 +42,6 @@ public static class IssuesHelper
         {
             // Assume 100 if issue is closed, if not assume 0
             progression = issue.ClosedAt.HasValue ? 100 : 0;
-        }
-        
-        // Find start and end date in custom properties
-        var startDateString = issue.CustomProperties.FirstOrDefault(x => x.Name == "Start")?.Value;
-        if (!DateTimeOffset.TryParse(startDateString, out var startDate))
-        {
-            startDate = DateTimeOffset.MinValue;
-        }
-        var endDateString = issue.CustomProperties.FirstOrDefault(x => x.Name == "Sluttdato")?.Value;
-        if (!DateTimeOffset.TryParse(endDateString, out var endDate))
-        {
-            startDate = DateTimeOffset.MinValue;
         }
         
         // Find days overdue. If the issue is not closed, and the end date is passed, the issue is overdue. If the issue is closed, the issue is overdue if the closed date is after the end date
@@ -67,10 +73,13 @@ public static class IssuesHelper
 
         // Successindicator is calculated like this:
         // - If the issue has a start date not yet passed, the success indicator is null
-        // - If the issue is not closed, and the current date is within start and end date, the success indicator is equal to the progression.
-        //   If the end date is passed, the success indicator is reduced by ReductionPerPercentOverdue for each percentage point the issue is overdue in days
-        // - If the issue is closed, the success indicator is equal to the progression. If the issue is closed after the end date, the success indicator is reduced by ReductionPerPercentOverdue for each percentage point the issue is overdue in days
-        int? successIndicator = 0;
+        // - If the issue is not closed:
+        //      - If the current date is within the start and end date, the success indicator is equal to the progression.
+        //      - If the end date is passed, the success indicator is reduced by ReductionPerPercentOverdue for each percentage point the issue is overdue in days
+        // - If the issue is closed:
+        //      - If the "closed" date is after the end date, the success indicator gets reduced by ReductionPerPercentOverdue for each percentage point the issue is overdue in days
+        //      - If the "closed" date is before the end date, the success indicator is equal to the progression
+        int? successIndicator;
         if (startDate > DateTimeOffset.UtcNow)
         {
             successIndicator = null;

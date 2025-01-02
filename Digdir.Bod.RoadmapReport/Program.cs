@@ -12,6 +12,7 @@ internal class Program
         
         builder.Services
             .AddSingleton<GitHubIssueCache>()
+            .AddHttpClient()
             .AddOpenApi();
 
         var app = builder.Build();

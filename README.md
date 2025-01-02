@@ -6,7 +6,7 @@ This is a API that generates a report based on the [Digdir Roadmap](https://gith
 
 1. Clone the repo
 2. Navigate to the project directory
-3. `dotnet user-secrets set GitHubToken <your-github-token>`
+3. `dotnet user-secrets set GitHubToken <your-github-PAT>` (the PAT must have `project`, `public_repo`, `read:org` scopes)
 4. Run the application (`dotnet run`)
 5. Open `https://localhost:7127/report` in your browser (or import it to Excel via PowerQuery)
 
